@@ -1,5 +1,5 @@
 import unittest
-from lane_lines_finder.camera.Camera import Camera
+from lane_lines_finder.camera import Camera
 import pathlib
 import os
 
