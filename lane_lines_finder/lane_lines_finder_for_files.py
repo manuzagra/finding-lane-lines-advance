@@ -1,5 +1,6 @@
+import pathlib
 from lane_lines_finder.utils import get_image, save_image
-from lane_lines_finder.pipeline import Pipeline
+from lane_lines_finder.pipeline import self_driving_car_pipeline
 import lane_lines_finder.steps as step
 import lane_lines_finder.camera as cam
 
@@ -14,10 +15,18 @@ class LaneLinesFinderForFiles:
     def process_image(self, in_image, out_image):
         img = get_image(in_image)
         if img is not None:
-            processed_img = self.pipeline(img)
-            save_image(processed_img, out_image)
+            processed_img = self.pipeline.process(img,
+                                                  file=pathlib.Path(in_image).name,
+                                                  input_directory=pathlib.Path(in_image).parent,
+                                                  output_directory=pathlib.Path(out_image).parent)
+            # TODO uncomment this line
+            # save_image(processed_img, out_image)
 
     def process_images_directory(self, in_dir, out_dir):
+        in_path = pathlib.Path(in_dir).resolve()
+        out_path = pathlib.Path(out_dir).resolve()
+        for f in in_path.glob('*'):
+            self.process_image(str(f), str(out_path.joinpath(f.name)))
         pass
 
     def process_video(self, in_video, out_video):
@@ -29,25 +38,14 @@ class LaneLinesFinderForFiles:
 
 if __name__ == '__main__':
 
-    pipeline = Pipeline()
+    finder = LaneLinesFinderForFiles()
 
-    camera = cam.Camera()
+    finder.set_pipeline(self_driving_car_pipeline())
 
-    pipeline.append(step.Grayscale())
-    pipeline.append(step.SaveImage(directory='../test_images_output', name='gray.jpg'))
-    pipeline.append(step.Threshold(min=0, max=100))
-    pipeline.append(step.Binary2Color(color=(255,0,0)))
-    pipeline.append(step.SaveImage(directory='../test_images_output', name='binary.jpg'))
+    finder.process_images_directory('../test_images', '../test_images_output')
 
-    img = get_image('test1.jpg', '../test_images')
+    i = 0
 
-    process_img = pipeline.process(img)
 
-    p = LaneLinesFinderForFiles()
-
-    p.calibrate_camera('../camera_cal', (9, 6))
-    #p.camera.dump_calibration('../camera_cal/calibration.p')
-    p.set_pipeline(llf_pipeline)
-    p.process_image('../test_images/test1.jpg', '../test_images_output/test1.jpg')
 
 

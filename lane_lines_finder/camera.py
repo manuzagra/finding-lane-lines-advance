@@ -8,7 +8,7 @@ from lane_lines_finder.process_step import ProcessStep
 
 class Camera(ProcessStep):
     def __init__(self, **kwargs):
-        ProcessStep.__init__(self)
+        super().__init__(**kwargs)
         self.matrix = None
         self.distortion_coefficients = None
         self.calibrated = False
@@ -23,8 +23,8 @@ class Camera(ProcessStep):
         elif kwargs.get('directory') and kwargs.get('pattern_size'):
             self.calibrate(kwargs['directory'], kwargs['pattern_size'])
 
-    def process(self, img, **kwargs):
-        return self.undistort(img)
+    def process(self, img=None, **kwargs):
+        return self.undistort(img), kwargs
 
     def dump_calibration(self, file):
         if self.calibrated:
