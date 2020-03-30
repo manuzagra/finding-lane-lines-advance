@@ -1,4 +1,3 @@
-import numpy as np
 import cv2
 
 from lane_lines_finder.process_step import ProcessStep
@@ -27,7 +26,7 @@ class PerspectiveTransform(ProcessStep):
         return cls(source_points=source_points, destination_points=destination_points, inverse=inverse)
 
     def process(self, img=None, **kwargs):
-        if kwargs.get('inverse'):
+        if self.inverse:
             return self.undo_transform(img), kwargs
         else:
             return self.transform(img), kwargs
@@ -39,31 +38,15 @@ class PerspectiveTransform(ProcessStep):
         return cv2.warpPerspective(img, self.matrix_inverse, (img.shape[1], img.shape[0]), flags=cv2.INTER_LINEAR)
 
 
-def self_driving_car_transform_points():
-    # src_points = np.float32([[270, 670], [610, 440], [670, 440], [1040, 670]])
-    # dst_points = np.float32([[270, 670], [270, 50], [1040, 50], [1040, 670]])
-    # src_points = np.float32([[193, 720], [610, 440], [670, 440], [1120, 720]])  # from to the bottom using lines
-    # dst_points = np.float32([[280, 720], [280, 0], [1000, 0], [1000, 720]])  # from to the bottom using lines
-    # src_points = np.float32([[193, 720], [575, 460], [710, 460], [1120, 720]])  # from middle to the bottom using lines
-    # dst_points = np.float32([[280, 720], [280, 0], [1000, 0], [1000, 720]])  # from middle to the bottom using lines
-
-    src_points = np.float32([[200, 720], [580, 460], [700, 460], [1080, 720]])  # from middle to the bottom image centered
-    dst_points = np.float32([[280, 720], [280, 0], [1000, 0], [1000, 720]])  # from middle to the bottom image centered
-    return src_points, dst_points
-
-
-def self_driving_car_transform(inverse=False):
-    return PerspectiveTransform(source_points=self_driving_car_transform_points()[0], destination_points=self_driving_car_transform_points()[1], inverse=inverse)
-
-
 if __name__ == '__main__':
     import pathlib
     import lane_lines_finder.utils as utils
+    import lane_lines_finder.self_driving_car as self_driving_car
 
 
     def plots_perspective_transform_lines():
-        perspective = self_driving_car_transform()
-        points = self_driving_car_transform_points()
+        perspective = self_driving_car.perspective_transform()
+        points = self_driving_car.transform_points()
         for path in pathlib.Path('../test_images').glob('*straight_lines*'):
             img = utils.get_image(path.resolve())
             img_transform = perspective.transform(img)

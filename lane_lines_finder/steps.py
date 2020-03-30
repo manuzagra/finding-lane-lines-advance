@@ -2,8 +2,35 @@ import numpy as np
 import cv2
 import pathlib
 from lane_lines_finder.process_step import ProcessStep
-from lane_lines_finder.perspective_transform import PerspectiveTransform, self_driving_car_transform, self_driving_car_transform_points
-from lane_lines_finder.camera import Camera, self_driving_car_camera
+from lane_lines_finder.camera import Camera
+from lane_lines_finder.perspective_transform import PerspectiveTransform
+from lane_lines_finder.lane_lines_detector import FindLines
+
+
+class DrawText(ProcessStep):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.function = None
+        self.color = None
+        self.coordinates = None
+        if 'function' in kwargs and 'color' in kwargs and 'coordinates' in kwargs:
+            self.setup(**kwargs)
+
+    def setup(self, **kwargs):
+        self.function = kwargs['function']
+        self.color = kwargs['color']
+        self.coordinates = kwargs['coordinates']
+        self.ready()
+
+    @classmethod
+    def from_params(cls, function, color, coordinates):
+        return cls(function=function, color=color, coordinates=coordinates)
+
+    def process(self, img=None, **kwargs):
+        self.check_ready()
+        text = self.function(img, **kwargs)
+        cv2.putText(img, text, self.coordinates, cv2.FONT_HERSHEY_DUPLEX, 0.8, self.color)
+        return img, kwargs
 
 
 class DrawPolygon(ProcessStep):
@@ -14,12 +41,12 @@ class DrawPolygon(ProcessStep):
         self.thickness = None
         if 'points' in kwargs and 'color' in kwargs and 'thickness' in kwargs:
             self.setup(**kwargs)
-            self.ready()
 
     def setup(self, **kwargs):
         self.points = kwargs['points']
         self.color = kwargs['color']
         self.thickness = kwargs['thickness']
+        self.ready()
 
     @classmethod
     def from_params(cls, points, color, thickness):
@@ -27,10 +54,101 @@ class DrawPolygon(ProcessStep):
 
     def process(self, img=None, **kwargs):
         self.check_ready()
-        image = np.copy(img)
         for i in range(-1, self.points.shape[0]-1):
-            cv2.line(image, (self.points[i,0],self.points[i,1]), (self.points[i+1,0],self.points[i+1,1]), self.color, self.thickness)
-        return image, kwargs
+            cv2.line(img, (self.points[i,0],self.points[i,1]), (self.points[i+1,0],self.points[i+1,1]), self.color, self.thickness)
+        return img, kwargs
+
+
+class FillPolygon(ProcessStep):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.function = None
+        self.color = None
+        if 'function' in kwargs and 'color' in kwargs:
+            self.setup(**kwargs)
+
+    def setup(self, **kwargs):
+        self.function = kwargs['function']
+        self.color = kwargs['color']
+        self.ready()
+
+    @classmethod
+    def from_params(cls, function, color):
+        return cls(function=function, color=color)
+
+    def process(self, img=None, **kwargs):
+        self.check_ready()
+        points = self.function(img, **kwargs)
+        cv2.fillPoly(img, np.int_([points]), self.color)
+        #cv2.fillConvexPoly(img, points, self.color)
+        return img, kwargs
+
+
+class ColorPoints(ProcessStep):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.function = None  # it returns the values of a cv2.fitPoly()
+        self.color = None
+        if 'function' in kwargs and 'color' in kwargs:
+            self.setup(**kwargs)
+
+    def setup(self, **kwargs):
+        self.function = kwargs['function']
+        self.color = kwargs['color']
+        self.ready()
+
+    @classmethod
+    def from_params(cls, function, color):
+        return cls(function=function, color=color)
+
+    def process(self, img=None, **kwargs):
+        self.check_ready()
+        points = self.function(img, **kwargs)
+        img[points[:,1], points[:,0]] = list(self.color)
+        return img, kwargs
+
+
+class DrawPolynomial(ProcessStep):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.function = None  # it returns the values of a cv2.fitPoly()
+        self.color = None
+        if 'function' in kwargs and 'color' in kwargs:
+            self.setup(**kwargs)
+
+    def setup(self, **kwargs):
+        self.function = kwargs['function']
+        self.color = kwargs['color']
+        self.ready()
+
+    @classmethod
+    def from_params(cls, function, color):
+        return cls(function=function, color=color)
+
+    def process(self, img=None, **kwargs):
+        self.check_ready()
+        poly = self.function(img, **kwargs)
+        y = np.linspace(0, img.shape[0] - 1, img.shape[0]).astype(np.int)
+        x = (poly[0] * y ** 2 + poly[1] * y + poly[2]).astype(np.int)
+        img[y, x] = list(self.color)
+        return img, kwargs
+
+
+class ClearImage(ProcessStep):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.setup(**kwargs)
+
+    def setup(self, **kwargs):
+        self.ready()
+
+    @classmethod
+    def from_params(cls):
+        return cls()
+
+    def process(self, img=None, **kwargs):
+        self.check_ready()
+        return np.zeros_like(img), kwargs
 
 
 class SelectChannel(ProcessStep):
@@ -39,10 +157,10 @@ class SelectChannel(ProcessStep):
         self.channel = None
         if 'channel' in kwargs:
             self.setup(**kwargs)
-        self.ready()
 
     def setup(self, **kwargs):
         self.channel = kwargs['channel']
+        self.ready()
 
     @classmethod
     def from_params(cls, channel):
@@ -59,10 +177,10 @@ class Binary2Color(ProcessStep):
         self.color = (255, 255, 255)
         if 'color' in kwargs:
             self.setup(**kwargs)
-        self.ready()
 
     def setup(self, **kwargs):
         self.color = kwargs['color']
+        self.ready()
 
     @classmethod
     def from_params(cls, color=(255, 255, 255)):
@@ -77,14 +195,14 @@ class CombineBinary(ProcessStep):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.pipelines = None
-        self.function = None
+        self.function = None  # combine the output of the different pipelines
         if 'function' in kwargs and 'pipelines' in kwargs:
             self.setup(**kwargs)
-            self.ready()
 
     def setup(self, **kwargs):
         self.pipelines = kwargs['pipelines']
         self.function = kwargs['function']
+        self.ready()
 
     @classmethod
     def from_params(cls, combining_function):
@@ -98,7 +216,7 @@ class CombineBinary(ProcessStep):
             image, kwargs = pip.process(img, **kwargs)
             images.append(image)
         combined = np.zeros_like(img[:,:,0])
-        combined[self.function(images)] = 1
+        combined[self.function(images, **kwargs)] = 1
         return combined, kwargs
 
 
@@ -109,11 +227,11 @@ class CombineImages(ProcessStep):
         self.weights = None
         if 'pipelines' in kwargs and 'weights'in kwargs:
             self.setup(**kwargs)
-            self.ready()
 
     def setup(self, **kwargs):
         self.pipelines = kwargs['pipelines']
         self.weights = kwargs['weights']
+        self.ready()
 
     @classmethod
     def from_params(cls, pipelines, weights):
@@ -137,12 +255,12 @@ class SaveImage(ProcessStep):
         self.postfix = kwargs.get('postfix', '')
         if 'directory' in kwargs and 'prefix' in kwargs and 'postfix' in kwargs:
             self.setup(**kwargs)
-        self.ready()
 
     def setup(self, **kwargs):
         self.directory = kwargs['directory']
         self.prefix = kwargs['prefix']
         self.postfix = kwargs['postfix']
+        self.ready()
 
     @classmethod
     def from_params(cls, directory='', prefix='', postfix=''):
@@ -165,10 +283,10 @@ class GaussianBlur(ProcessStep):
         self.kernel_size = 5
         if 'kernel_size' in kwargs:
             self.setup(**kwargs)
-        self.ready()
 
     def setup(self, **kwargs):
         self.kernel_size = kwargs['kernel_size']
+        self.ready()
 
     @classmethod
     def from_params(cls, kernel_size):
@@ -186,10 +304,10 @@ class Grayscale(ProcessStep):
         self.flag = cv2.COLOR_BGR2GRAY
         if 'flag' in kwargs:
             self.setup(**kwargs)
-        self.ready()
 
     def setup(self, **kwargs):
         self.flag = kwargs['flag']
+        self.ready()
 
     @classmethod
     def from_params(cls, flag=cv2.COLOR_BGR2GRAY):
@@ -206,10 +324,10 @@ class ConvertColor(ProcessStep):
         self.flag = None
         if 'flag' in kwargs:
             self.setup(**kwargs)
-            self.ready()
 
     def setup(self, **kwargs):
         self.flag = kwargs['flag']
+        self.ready()
 
     @classmethod
     def from_params(cls, flag):
@@ -223,10 +341,10 @@ class ConvertColor(ProcessStep):
 class HistogramEqualization(ProcessStep):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.ready()
+        self.setup(**kwargs)
 
     def setup(self, **kwargs):
-        pass
+        self.ready()
 
     @classmethod
     def from_params(cls):
@@ -255,11 +373,11 @@ class Threshold(ProcessStep):
         self.max = None
         if 'min' in kwargs and 'max' in kwargs:
             self.setup(**kwargs)
-            self.ready()
 
     def setup(self, **kwargs):
         self.min = kwargs['min']
         self.max = kwargs['max']
+        self.ready()
 
     @classmethod
     def from_params(cls, min_thres, max_thres):
@@ -281,13 +399,13 @@ class AbsSobel(ProcessStep):
         self.kernel_size = 0
         if 'axis' in kwargs and 'kernel_size' in kwargs:
             self.setup(**kwargs)
-            self.ready()
 
     def setup(self, **kwargs):
         if kwargs['axis'] not in ['x', 'y']:
             raise ValueError('Axis for Sobel must be "x" or "y".')
         self.axis = (1, 0) if kwargs['axis'] == 'x' else (0, 1)
         self.kernel_size = kwargs['kernel_size']
+        self.ready()
 
     @classmethod
     def from_params(cls, axis, kernel_size):
@@ -307,10 +425,10 @@ class GradienteMag(ProcessStep):
         self.kernel_size = 3
         if 'kernel_size' in kwargs:
             self.setup(**kwargs)
-        self.ready()
 
     def setup(self, **kwargs):
         self.kernel_size = kwargs['kernel_size']
+        self.ready()
 
     @classmethod
     def from_params(cls, kernel_size):
@@ -331,10 +449,10 @@ class GradientDir(ProcessStep):
         self.kernel_size = 3
         if 'kernel_size' in kwargs:
             self.setup(**kwargs)
-        self.ready()
 
     def setup(self, **kwargs):
         self.kernel_size = kwargs['kernel_size']
+        self.ready()
 
     @classmethod
     def from_params(cls, kernel_size):

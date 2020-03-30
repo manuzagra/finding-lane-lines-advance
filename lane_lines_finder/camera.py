@@ -126,12 +126,6 @@ class Camera(ProcessStep):
         return cv2.undistort(img, self.matrix, self.distortion_coefficients)  #, None, mtx)
 
 
-def self_driving_car_camera():
-    camera = Camera()
-    camera.calibrate('../camera_cal', (9, 6))
-    return camera
-
-
 if __name__ == '__main__':
     cam = Camera()
     cam.calibrate('./test', (9, 6))

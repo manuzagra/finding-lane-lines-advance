@@ -8,5 +8,5 @@ setup(name='lane_lines_finder',
       author_email='manuzagra@gmail.com',
       license='',
       packages=['lane_lines_finder',],
-      install_requires=['numpy', 'matplotlib'],  # + 'cv2'
+      install_requires=['numpy', 'moviepy'],  # + 'cv2'
       zip_safe=False)
