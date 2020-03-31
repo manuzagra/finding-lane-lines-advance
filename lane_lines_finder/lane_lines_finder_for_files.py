@@ -1,7 +1,7 @@
 import pathlib
 from moviepy.editor import VideoFileClip
 from lane_lines_finder.utils import get_image, save_image
-from lane_lines_finder.self_driving_car import pipeline as self_driving_car_pipeline
+import lane_lines_finder.self_driving_car as self_driving_car
 
 
 class LaneLinesFinderForFiles:
@@ -64,11 +64,10 @@ if __name__ == '__main__':
 
     finder = LaneLinesFinderForFiles()
 
-    finder.set_pipeline_factory(self_driving_car_pipeline)
+    finder.set_pipeline_factory(self_driving_car.pipeline)
 
-    # finder.process_images_directory('../test_images', '../test_images_output')
-
-    finder.process_video('../test_videos/project_video.mp4', '../test_videos_output/project_video.mp4')
+    finder.process_images_directory('../test_images', '../test_images_output')
+    #finder.process_video('../test_videos/project_video.mp4', '../test_videos_output/project_video.mp4')
 
 
 

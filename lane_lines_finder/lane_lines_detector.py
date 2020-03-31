@@ -5,6 +5,9 @@ from lane_lines_finder.process_step import ProcessStep
 
 
 class Window:
+    """
+    Keeps the calculations done by the sliding window
+    """
     def __init__(self, width=None, heigth=None):
         self._x_range = [0, 0]
         self._y_range = [0, 0]
@@ -53,7 +56,6 @@ class Window:
     def get_rectangle(self):
         return (self._x_range[0], self._y_range[0]), (self._x_range[1], self._y_range[1])
 
-    # TODO check this function
     def inner_nonzero_pixels(self, img):
         """
         :param img:
@@ -69,6 +71,9 @@ class Window:
 
 
 class Line:
+    """
+    Encapsulates the calculations done to integrate various lines.
+    """
     def __init__(self, size):
         self.size = size
         # number of valid lines
@@ -88,6 +93,11 @@ class Line:
         self.poly = np.vstack([poly, self.poly[:-1]])
 
     def best(self):
+        """
+        Calculate the best stimation of the line given all the information it has.
+        It implements a weighted average, the older a line is the lighter is its weight.
+        :return:
+        """
         t = 0
         poly = np.zeros_like(self.poly[0])
         for i in range(self.valid_lines):
@@ -101,6 +111,12 @@ class Line:
 
     @classmethod
     def combine(cls, l1, l2):
+        """
+        Combine two lines and return two parallel lines.
+        :param l1:
+        :param l2:
+        :return:
+        """
         p1 = l1.best()
         p2 = l2.best()
 
@@ -114,6 +130,9 @@ class Line:
 
 
 class FindLines(ProcessStep):
+    """
+    Find lane lines in binary bird eye view images.
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # parameters of the sliding window
@@ -181,11 +200,10 @@ class FindLines(ProcessStep):
         return img, kwargs
 
     def check_lines(self, polys):
-        return True  # TODO change this
         # check curvature is similar
         c_l = self.measure_curvature(polys[0], 719)
         c_r = self.measure_curvature(polys[1], 719)
-        if np.absolute(c_l - c_r) > 0.5 * (c_l + c_r)/2:
+        if np.absolute(c_l - c_r) > 1*(c_l + c_r)/2:
             # lines do not have similar curvature
             return False
 
@@ -196,11 +214,11 @@ class FindLines(ProcessStep):
             x_l = polys[0][0] * y**2 + polys[0][1] * y + polys[0][2]
             x_r = polys[1][0] * y**2 + polys[1][1] * y + polys[1][2]
             diff_m = np.absolute(x_r - x_l) * self.pixels_to_meters[0]
-            if np.absolute(diff_m - 3.7) > 0.5:
+            if np.absolute(diff_m - 3.7) > 3:
                 # Lines are not separated more or less 3.7 m
                 return False
             dist.append(diff_m)
-        if np.any(np.absolute(np.array(dist)-np.mean(dist)) > 0.5*np.mean(dist)):
+        if np.any(np.absolute(np.array(dist)-np.mean(dist)) > 1*np.mean(dist)):
             # distances in the three points arent similar
             return False
         return True

@@ -4,6 +4,10 @@ from lane_lines_finder.process_step import ProcessStep
 
 
 class PerspectiveTransform(ProcessStep):
+    """
+    Given a set of input points and output points it calculates the correspondent transform
+    and it is able to produce that transform in images.
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # self.source_points = None
@@ -15,10 +19,10 @@ class PerspectiveTransform(ProcessStep):
             self.setup(**kwargs)
 
     def setup(self, **kwargs):
-        # self.source_points = kwargs['source_points']
-        # self.destination_points = kwargs['destination_points']
+        # calculate the matrix and the inverse matrix of the transform
         self.matrix = cv2.getPerspectiveTransform(kwargs['source_points'], kwargs['destination_points'])
         self.matrix_inverse = cv2.getPerspectiveTransform(kwargs['destination_points'], kwargs['source_points'])
+        # True to undo the transform
         self.inverse = kwargs['inverse']
 
     @classmethod
@@ -45,12 +49,15 @@ if __name__ == '__main__':
 
 
     def plots_perspective_transform_lines():
+        """
+        Function to get images of the process
+        :return:
+        """
         perspective = self_driving_car.perspective_transform()
         points = self_driving_car.transform_points()
         for path in pathlib.Path('../test_images').glob('*straight_lines*'):
             img = utils.get_image(path.resolve())
             img_transform = perspective.transform(img)
-            # utils.save_image(perspective.undo_transform(img_transform), 'perspective_ret_'+path.name, '../writeup_images')
             for i in range(-1, points[0].shape[0] - 1):
                 cv2.line(img, (points[0][i, 0], points[0][i, 1]), (points[0][i + 1, 0], points[0][i + 1, 1]),
                          (0, 0, 255), 2)

@@ -255,6 +255,7 @@ class SaveImage(ProcessStep):
         self.postfix = kwargs.get('postfix', '')
         if 'directory' in kwargs and 'prefix' in kwargs and 'postfix' in kwargs:
             self.setup(**kwargs)
+        self.ready()
 
     def setup(self, **kwargs):
         self.directory = kwargs['directory']

@@ -7,6 +7,9 @@ from lane_lines_finder.process_step import ProcessStep
 
 
 class Camera(ProcessStep):
+    """
+    It encapsulate the parameters of the camera and correct the distortion produced by the lens
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.matrix = None
@@ -16,6 +19,7 @@ class Camera(ProcessStep):
             self.setup(**kwargs)
 
     def setup(self, **kwargs):
+        # It is possible to set it up directly with the parameters or computating the calibration
         if kwargs.get('matrix') and kwargs.get('distortion_coefficients'):
             self.matrix = kwargs['matrix']
             self.distortion_coefficients = kwargs['distortion_coefficients']
@@ -24,9 +28,15 @@ class Camera(ProcessStep):
             self.calibrate(kwargs['directory'], kwargs['pattern_size'])
 
     def process(self, img=None, **kwargs):
+        # Undistort the image
         return self.undistort(img), kwargs
 
     def dump_calibration(self, file):
+        """
+        Dump the calibration parameters
+        :param file: path where to dump the parameters
+        :return: bool, depending if the dump could be done
+        """
         if self.calibrated:
             with open(file, 'wb') as f:
                 pickle.dump({'matrix': self.matrix, 'distortion_coefficients': self.distortion_coefficients}, f)
@@ -36,6 +46,11 @@ class Camera(ProcessStep):
         return False
 
     def load_calibration(self, file):
+        """
+        Load the calibration parameters from a file.
+        :param file: path to the file with the dumped configuration parameters
+        :return: True if the file was found and it contains the parameters, False otherwise
+        """
         try:
             with open(file, 'rb') as f:
                 cal = pickle.load(f)
@@ -52,7 +67,12 @@ class Camera(ProcessStep):
             return False
 
     def calibrate_from_chessboard(self, directory, pattern_size):
-        """"""
+        """
+        Calibrate the camera parameters using chessboard patterns.
+        :param directory: path to the directory containing the images of the chessboard
+        :param pattern_size: number of vertices inside the chessboard
+        :return: True if the camera is successfully calibrated, False otherwise
+        """
         # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0) defining the points detected in the chessboard
         obj_points_prototype = np.zeros((pattern_size[1] * pattern_size[0], 3), np.float32)
         obj_points_prototype[:, :2] = np.mgrid[0:pattern_size[0], 0:pattern_size[1]].T.reshape(-1, 2)
@@ -101,6 +121,7 @@ class Camera(ProcessStep):
                 # Append the objects to the calibration matrices
                 obj_points.append(obj_points_prototype)
                 img_points.append(corners)
+        # Around 20 images is a good number, less than 5 the calibration can not be good
         if n_img >= 5:
             # Do camera calibration given object points and image points
             _, mtx, dist, _, _ = cv2.calibrateCamera(obj_points, img_points, img_size, None, None)
@@ -114,20 +135,37 @@ class Camera(ProcessStep):
             return False
 
     def calibrate(self, directory, pattern_size):
+        """
+        General method to calibrate a camera.
+        It will look for dumped parameters and calibrate from chessboard if the dumped file is not found.
+        :param directory: directory to look for everything
+        :param pattern_size: to use if a dump file is not found
+        :return: True if the camera have been calibrated, False otherwise
+        """
         directory = pathlib.Path(directory).resolve()
+        # look for dumped file in the directory and load it if it exist
         for p in directory.glob('*.p'):
             if self.load_calibration(str(p)):
                 return True
+        # calibrate from chessboard
         self.calibrate_from_chessboard(directory, pattern_size)
+        # save the calibration parameters
         self.dump_calibration(pathlib.Path(directory).joinpath('calibration.p').resolve())
         return self.calibrated
 
     def undistort(self, img):
+        # undo the distortion
         return cv2.undistort(img, self.matrix, self.distortion_coefficients)  #, None, mtx)
 
 
 if __name__ == '__main__':
-    cam = Camera()
-    cam.calibrate('./test', (9, 6))
+    from lane_lines_finder.self_driving_car import camera
+    from lane_lines_finder.utils import get_image, save_image
 
-    i = 0
+    c = camera()
+
+    img = get_image('../camera_cal/calibration1.jpg')
+    p_img = c.undistort(img)
+    save_image(img, '../writeup_images/camera_calibration_before.jpg')
+    save_image(p_img, '../writeup_images/camera_calibration_after.jpg')
+
